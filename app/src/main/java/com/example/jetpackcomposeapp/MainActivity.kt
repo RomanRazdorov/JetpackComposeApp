@@ -10,21 +10,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.BottomAppBar
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.Scaffold
 import androidx.compose.material.TopAppBar
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.rememberScaffoldState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -36,17 +31,20 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import kotlinx.coroutines.launch
 import androidx.compose.runtime.*
-
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.os.Build
+import android.content.Context
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.*
+import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.Build
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 
 
 data class Student(val name: String, val group: String)
-
-enum class Screen {
-    Home,
-    Menu
-}
 
 private val textStyle =
     TextStyle(
@@ -55,6 +53,16 @@ private val textStyle =
         fontWeight = FontWeight.Bold,
         color = Color.Black
     )
+// Другие стили
+/*
+   TextStyle(
+       fontFamily = FontFamily.Serif,
+       fontSize = 21.sp,
+       fontWeight = FontWeight.Light,
+       color = Color.Magenta
+   )
+   */
+
 
 @Composable
 fun StudentInfo(studentName: String, group: String) {
@@ -94,45 +102,6 @@ fun StudentListScreen(students: List<Student>, navigateToDetail: (Student) -> Un
 }
 
 @Composable
-fun DrawerItem(
-    screen: Screen,
-    currentScreen: Screen,
-    onClick: (Screen) -> Unit
-) {
-    Text(
-        text = stringResource(id = R.string.screen_home),
-        style = textStyle,
-        modifier = Modifier
-            .padding(16.dp)
-            .clickable {
-                if (screen != currentScreen) {
-                    onClick(screen)
-                }
-            }
-    )
-}
-
-@Composable
-fun DrawerContent(
-    currentScreen: Screen,
-    onScreenSelected: (Screen) -> Unit
-) {
-    Column {
-        DrawerItem(
-            screen = Screen.Home,
-            currentScreen = currentScreen,
-            onClick = onScreenSelected
-        )
-        DrawerItem(
-            screen = Screen.Menu,
-            currentScreen = currentScreen,
-            onClick = onScreenSelected
-        )
-    }
-}
-
-
-@Composable
 fun StudentDetailScreen(student: Student) {
 
     Column(
@@ -149,16 +118,13 @@ fun StudentDetailScreen(student: Student) {
     }
 }
 
-@Composable
-fun MyApp(students: List<Student>) {
-    val navController = rememberNavController()
-    val scaffoldState = rememberScaffoldState()
-    val scope = rememberCoroutineScope()
-    var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MyApp(students: List<Student>, context: Context) {
+    val navController = rememberNavController()
 
     Scaffold(
-        scaffoldState = scaffoldState,
         topBar = {
             TopAppBar(
                 title = {
@@ -168,30 +134,18 @@ fun MyApp(students: List<Student>) {
         },
         bottomBar = {
             BottomAppBar(
-                backgroundColor = Color.Blue
+                containerColor = Color.Blue
             ) {
-
                 IconButton(
                     onClick = {
-                        scope.launch {
-                            scaffoldState.drawerState.open()
-                        }
+                        // Здесь мы запускаем работу с WorkManager при нажатии на кнопку
+                        val workRequest = OneTimeWorkRequestBuilder<MyWorker>().build()
+                        WorkManager.getInstance(context).enqueue(workRequest)
                     }
                 ) {
-                    Icon(imageVector = Icons.Default.Menu, contentDescription = "Меню")
+                    Icon(imageVector = Icons.Default.Build, contentDescription = "Меню")
                 }
             }
-        },
-        drawerContent = {
-            DrawerContent(
-                currentScreen = currentScreen,
-                onScreenSelected = { newScreen ->
-                    currentScreen = newScreen // Обновляем currentScreen с использованием mutableStateOf
-                    scope.launch {
-                        scaffoldState.drawerState.close()
-                    }
-                }
-            )
         }
     ) { innerPadding ->
         NavHost(
@@ -199,6 +153,7 @@ fun MyApp(students: List<Student>) {
             startDestination = "studentList"
         ) {
             composable("studentList") {
+                // Экран со списком студентов
                 StudentListScreen(students) { student ->
                     navController.navigate("studentDetail/${student.name}/${student.group}")
                 }
@@ -210,6 +165,7 @@ fun MyApp(students: List<Student>) {
                     navArgument("group") { type = NavType.StringType }
                 )
             ) { backStackEntry ->
+                // Экран с подробной информацией о студенте
                 val studentName = backStackEntry.arguments?.getString("studentName")
                 val group = backStackEntry.arguments?.getString("group")
                 if (studentName != null && group != null) {
@@ -226,6 +182,20 @@ fun MyApp(students: List<Student>) {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Создание канала уведомлений
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channelName = "My Channel"
+            val channelDescription = "Описание вашего канала уведомлений"
+            val importance = NotificationManager.IMPORTANCE_DEFAULT
+            val channel = NotificationChannel("channel_id", channelName, importance).apply {
+                description = channelDescription
+            }
+
+            val notificationManager = getSystemService(NotificationManager::class.java)
+            notificationManager.createNotificationChannel(channel)
+        }
+
         val students = listOf(
             Student("Осипов М.А.", "ИКБО-12-21"),
             Student("RomanRazdorov", "ИКБО-100-23"),
@@ -234,7 +204,7 @@ class MainActivity : ComponentActivity() {
             // Добавьте других студентов по аналогии
         )
         setContent {
-            MyApp(students)
+            MyApp(students, applicationContext)
         }
     }
 }
