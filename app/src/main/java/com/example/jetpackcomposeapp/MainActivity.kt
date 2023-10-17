@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -23,6 +25,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.jetpackcomposeapp.ui.theme.JetpackComposeAppTheme
+
+data class Student(val name: String, val group: String)
 
 private val textStyle =
 
@@ -62,7 +66,7 @@ fun StudentInfo(studentName: String, group: String) {
 }
 
 @Composable
-fun MyApp(studentName: String, group: String) {
+fun MyApp(students: List<Student>) {
     MaterialTheme(
         typography = Typography(
             TextStyle(
@@ -75,7 +79,11 @@ fun MyApp(studentName: String, group: String) {
                 color = MaterialTheme.colorScheme.background,
                 modifier = Modifier.fillMaxSize()
             ) {
-                StudentInfo(studentName, group)
+                LazyColumn {
+                    items(students) { student ->
+                        StudentInfo(student.name, student.group)
+                    }
+                }
             }
         }
     )
@@ -84,7 +92,16 @@ fun MyApp(studentName: String, group: String) {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { MyApp(studentName = "Осипов М.А.", group = "ИКБО-12-21") }
+        val students = listOf(
+            Student("Осипов М.А.", "ИКБО-12-21"),
+            Student("RomanRazdorov", "ИКБО-100-23"),
+            Student("Programming war crimes 1", "ИКБО-102-23"),
+            Student("Escape the backrooms 2", "ИКБО-100-23"),
+            // Добавьте других студентов по аналогии
+        )
+        setContent {
+            MyApp(students)
+        }
     }
 }
 
